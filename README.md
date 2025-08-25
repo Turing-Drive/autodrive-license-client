@@ -1,14 +1,14 @@
 # AutoDrive License Client Tools
 
-This repository provides helper scripts for generating license requests for **AutoDrive**.  
-It collects a set of hardware identifiers (HWID) from the target machine, hashes them,  
-and writes out a JSON file that can be sent to AutoDrive for license activation.  
+This repository provides helper scripts for generating license requests for **AutoDrive**.
+
+It collects a set of hardware identifiers (HWID) from the target machine, hashes them, and writes out a JSON file that can be sent to AutoDrive for license activation.  
 
 ## Features
 
 - Collects hardware identifiers without using MAC addresses  
 - Generates reproducible HWID (SHA-256) from system components  
-- Produces a `license_request.json` file ready to send to AutoDrive  
+- Produces a `license_request-<HWID>.json` file ready to send to AutoDrive  
 - Simple command-line usage (Python 3.x required)  
 
 ## Installation
@@ -33,8 +33,7 @@ No additional dependencies are required (only Python standard library).
 python3 ./collect_hwid.py --customer <YOUR_COMPANY_NAME>
 ```
 
-This will generate a file license_request.json in the current directory.
-It also prints the HWID SHA-256 hash to the console.
+This will generate a file named `license_request-<HWID>.json` in the current directory, where `<HWID>` is derived from the machine’s hardware fingerprint. The script will also print the HWID (SHA-256 hash) to the console.
 
 ## Output Format
 
@@ -62,15 +61,13 @@ The generated JSON file contains:
 
 ## Next Step
 
-Please send the generated `license_request-*.json` file  
-to your AutoDrive business contact for license activation.
+Please send the generated `license_request-<HWID>.json` file to your AutoDrive business contact for license activation.
 
-After AutoDrive provides you with the `license-*.json` file,  
-you just need to run the provided script `autodrive-license-install.sh` on the target machine.  
+After AutoDrive provides you with the `license-<HWID>.json` file, you just need to run the provided script `autodrive-license-install.sh` on the target machine.  
 
 ### Usage
 
-1. Place `license*.json` and `autodrive-license-install.sh` in the same directory.  
+1. Place `license-<HWID>.json` and `autodrive-license-install.sh` in the same directory.  
 2. Run the script:
 
 ```bash
