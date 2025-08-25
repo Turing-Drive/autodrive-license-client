@@ -1,9 +1,9 @@
 #!/bin/bash
-# install_license.sh — install license*.json (excluding license_request*.json) into /opt/app/
+# install_license.sh — install license*.json (excluding license_request*.json) into /opt/AutoDrive/
 
 set -Eeuo pipefail
 
-TARGET_DIR="/opt/app"
+TARGET_DIR="/opt/AutoDrive"
 
 # Make globs that don't match expand to nothing
 shopt -s nullglob
