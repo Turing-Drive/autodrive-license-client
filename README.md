@@ -29,7 +29,7 @@ No additional dependencies are required (only Python standard library).
 ### Get HWID from target machine
 
 ```bash
-python3 ./collect_tools/collect_hwid.py --customer <YOUR_COMPANY_NAME>
+python3 ./collect_hwid.py --customer <YOUR_COMPANY_NAME>
 ```
 
 This will generate a file license_request.json in the current directory.
