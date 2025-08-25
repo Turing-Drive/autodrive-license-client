@@ -49,28 +49,35 @@ def calc_components():
 
 def main():
     ap = argparse.ArgumentParser(description="Collect HWID for license request (no MACs).")
-    ap.add_argument("--out", default="license_request.json")
+    ap.add_argument("--out", default="", help="Output filename (optional)")
     ap.add_argument("--features", nargs="*", default=["AutoDrive"], help="Requested features (optional)")
     ap.add_argument("--customer", default="", help="Customer label (optional)")
     args = ap.parse_args()
 
     parts = calc_components()
     hwid = hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()
+
+    # decide output filename
+    if args.out:
+        outname = args.out
+    else:
+        outname = f"license_request-{hwid[:12]}.json"
+
     req = {
         "version": 1,
         "timestamp": int(time.time()),
         "customer": args.customer,
         "features": sorted(args.features),
-        "hwid_components": parts,          
-        "hwid_sha256": hwid,               
+        "hwid_components": parts,
+        "hwid_sha256": hwid,
         "env": {
             "uname": os.uname().sysname + " " + os.uname().release,
             "in_docker_hint": os.path.exists("/.dockerenv"),
         },
     }
-    with open(args.out, "w") as f:
+    with open(outname, "w") as f:
         json.dump(req, f, ensure_ascii=False, separators=(",",":"))
-    print("wrote", args.out)
+    print("wrote", outname)
     print("HWID:", hwid)
 
 if __name__ == "__main__":

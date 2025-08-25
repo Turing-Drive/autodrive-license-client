@@ -5,6 +5,7 @@ It collects a set of hardware identifiers (HWID) from the target machine, hashes
 and writes out a JSON file that can be sent to AutoDrive for license activation.  
 
 ## Features
+
 - Collects hardware identifiers without using MAC addresses  
 - Generates reproducible HWID (SHA-256) from system components  
 - Produces a `license_request.json` file ready to send to AutoDrive  
@@ -61,15 +62,15 @@ The generated JSON file contains:
 
 ## Next Step
 
-Please send the generated `license_request.json` file  
+Please send the generated `license_request-*.json` file  
 to your AutoDrive business contact for license activation.
 
-After AutoDrive provides you with the `license.json` file,  
+After AutoDrive provides you with the `license-*.json` file,  
 you just need to run the provided script `autodrive-license-install.sh` on the target machine.  
 
 ### Usage
 
-1. Place `license.json` and `autodrive-license-install.sh` in the same directory.  
+1. Place `license*.json` and `autodrive-license-install.sh` in the same directory.  
 2. Run the script:
 
 ```bash
