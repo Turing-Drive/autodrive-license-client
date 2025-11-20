@@ -46,10 +46,11 @@ The generated JSON file contains:
   "customer": "YourCompany",
   "features": ["AutoDrive"],
   "hwid_components": [
-    "brd:1234567890",
-    "dmi:abcd-ef01-2345-6789",
-    "fs:1111-2222",
-    "mid:deadbeefcafebabe"
+    "brd:1...",
+    "cpui:a...",
+    "cpus:1...",
+    "cpuv:e...",
+    "gpu:gpu-000000..."
   ],
   "hwid_sha256": "6b08a0f3...",
   "env": {
