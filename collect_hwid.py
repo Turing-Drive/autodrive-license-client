@@ -19,6 +19,19 @@ def read_all(p: str) -> str:
     except Exception:
         return ""
 
+def is_wsl() -> bool:
+    """Best-effort detection for WSL/WSL2."""
+    try:
+        # Common env hints
+        if os.environ.get("WSL_INTEROP") or os.environ.get("WSL_DISTRO_NAME"):
+            return True
+        rel = read_all("/proc/sys/kernel/osrelease").lower()
+        if "microsoft" in rel or "wsl" in rel:
+            return True
+    except Exception:
+        pass
+    return False
+
 _KEEP_FLAGS = {"sse2", "sse4_2", "avx", "avx2", "avx512f"}
 
 def parse_cpuinfo():
@@ -89,7 +102,11 @@ def collect_gpu_uuids():
 def read_board_name():
     """Read DMI board_name (lower/trimmed, no inner spaces)."""
     s = read_first_line("/sys/class/dmi/id/board_name")
-    return s
+    if s:
+        return s
+    if is_wsl():
+        return "wsl"
+    return ""
 
 def calc_components():
     """
@@ -100,8 +117,8 @@ def calc_components():
 
     bn = read_board_name()
     if not bn:
-        print("WARN: missing DMI board_name (/sys/class/dmi/id/board_name)", file=sys.stderr)
-        bn = ""
+        print("ERROR: missing DMI board_name (/sys/class/dmi/id/board_name)", file=sys.stderr)
+        sys.exit(3)
     parts.append(f"brd:{bn}")
 
     ci = parse_cpuinfo()
