@@ -100,8 +100,8 @@ def calc_components():
 
     bn = read_board_name()
     if not bn:
-        print("ERROR: missing DMI board_name (/sys/class/dmi/id/board_name)", file=sys.stderr)
-        sys.exit(3)
+        print("WARN: missing DMI board_name (/sys/class/dmi/id/board_name)", file=sys.stderr)
+        bn = ""
     parts.append(f"brd:{bn}")
 
     ci = parse_cpuinfo()
