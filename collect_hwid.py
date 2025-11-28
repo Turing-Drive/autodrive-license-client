@@ -32,7 +32,8 @@ def is_wsl() -> bool:
         pass
     return False
 
-_KEEP_FLAGS = {"sse2", "sse4_2", "avx", "avx2", "avx512f"}
+_KEEP_FLAGS_X86 = {"sse2", "sse4_2", "avx", "avx2", "avx512f"}
+_KEEP_FLAGS_ARM = {"asimd", "aes", "crc32", "sha1", "sha2", "atomics", "asimdrdm"}
 
 def parse_cpuinfo():
     """Parse /proc/cpuinfo (first processor block) into vendor/sig/isa-subset."""
@@ -41,6 +42,7 @@ def parse_cpuinfo():
         return None
     vendor = family = model = stepping = ""
     flags = ""
+    impl = arch = variant = part = rev = ""
     for line in txt.splitlines():
         if not line.strip():
             break
@@ -59,12 +61,31 @@ def parse_cpuinfo():
             stepping = re.sub(r"\s+", "", v)
         elif k in ("flags", "features"):
             flags = v
-    if not (vendor and family and model and stepping):
-        return None
-    present = sorted({t for t in re.split(r"\s+", flags) if t in _KEEP_FLAGS})
-    isa = ",".join(present) if present else ""
-    sig = f"{family}-{model}-{stepping}"
-    return {"vendor": vendor, "sig": sig, "isa": isa}
+        elif k == "cpuimplementer":
+            impl = re.sub(r"\s+", "", v)
+        elif k == "cpuarchitecture":
+            arch = re.sub(r"\s+", "", v)
+        elif k == "cpuvariant":
+            variant = re.sub(r"\s+", "", v)
+        elif k == "cpupart":
+            part = re.sub(r"\s+", "", v)
+        elif k == "cpurevision":
+            rev = re.sub(r"\s+", "", v)
+    # x86 path
+    if vendor and family and model and stepping:
+        present = sorted({t for t in re.split(r"\s+", flags) if t in _KEEP_FLAGS_X86})
+        isa = ",".join(present) if present else ""
+        sig = f"{family}-{model}-{stepping}"
+        return {"vendor": vendor, "sig": sig, "isa": isa}
+
+    # ARM path
+    if impl and arch and variant and part and rev:
+        present = sorted({t for t in re.split(r"\s+", flags) if t in _KEEP_FLAGS_ARM})
+        isa = ",".join(present) if present else ""
+        sig = f"{arch}-{variant}-{part}-{rev}"
+        return {"vendor": impl, "sig": sig, "isa": isa}
+
+    return None
 
 _UUID_RE = re.compile(r"UUID:\s*(GPU-[A-Za-z0-9\-]+)", re.IGNORECASE)
 
