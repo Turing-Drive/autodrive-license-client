@@ -19,6 +19,15 @@ def read_all(p: str) -> str:
     except Exception:
         return ""
 
+def is_tegra() -> bool:
+    """Detect Jetson / Orin (Tegra) via device-tree compatible string."""
+    try:
+        compat = read_all("/sys/firmware/devicetree/base/compatible")
+        compat = compat.lower()
+        return "nvidia,tegra" in compat
+    except Exception:
+        return False
+
 def is_wsl() -> bool:
     """Best-effort detection for WSL/WSL2."""
     try:
@@ -120,6 +129,31 @@ def collect_gpu_uuids():
     uuids = sorted(sorted(set(uuids)))
     return uuids
 
+def read_emmc_cid():
+    """Return CID of first non-removable mmcblk* device (lowercase, no spaces)."""
+    base = Path("/sys/block")
+    if not base.exists():
+        return ""
+    cids = []
+    for e in base.iterdir():
+        name = e.name
+        if not name.startswith("mmcblk"):
+            continue
+        try:
+            rem = (e / "removable").read_text().strip()
+            if rem == "1":
+                continue
+        except Exception:
+            continue
+        try:
+            cid = (e / "device" / "cid").read_text().strip().lower()
+            cid = re.sub(r"\s+", "", cid)
+            if cid:
+                cids.append(cid)
+        except Exception:
+            continue
+    return sorted(cids)[0] if cids else ""
+
 def read_board_name():
     """Read DMI board_name (lower/trimmed, no inner spaces)."""
     s = read_first_line("/sys/class/dmi/id/board_name")
@@ -153,9 +187,23 @@ def calc_components():
 
     uuids = collect_gpu_uuids()
     if not uuids:
-        print("ERROR: no NVIDIA GPU UUID found (need at least one GPU)", file=sys.stderr)
-        sys.exit(3)
-    parts.append("gpu:" + ";".join(uuids))
+        if not is_tegra():
+            print(
+                "ERROR: no NVIDIA GPU UUID found (need at least one GPU, "
+                "and non-Tegra platforms must expose a UUID)",
+                file=sys.stderr,
+            )
+            sys.exit(3)
+        cid = read_emmc_cid()
+        if not cid:
+            print(
+                "ERROR: Tegra platform detected but eMMC CID not readable",
+                file=sys.stderr,
+            )
+            sys.exit(3)
+        parts.append("gpu:" + cid)
+    else:
+        parts.append("gpu:" + ";".join(uuids))
 
     parts.sort()
     return parts
