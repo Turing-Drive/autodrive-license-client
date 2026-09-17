@@ -186,43 +186,6 @@ def read_tegra_ecid() -> str:
 
     return ""
 
-def read_tegra_module_serial() -> str:
-    """Read Tegra SOM module serial number from device-tree (non-root accessible)."""
-    for p in ["/proc/device-tree/serial-number", "/sys/firmware/devicetree/base/serial-number"]:
-        try:
-            raw = Path(p).read_bytes().rstrip(b"\x00").decode("utf-8", errors="ignore").strip()
-            val = re.sub(r"\s+", "", raw).lower()
-            if val:
-                return val
-        except Exception:
-            pass
-    return ""
-
-def read_emmc_cid():
-    """Return CID of first non-removable mmcblk* device (lowercase, no spaces)."""
-    base = Path("/sys/block")
-    if not base.exists():
-        return ""
-    cids = []
-    for e in base.iterdir():
-        name = e.name
-        if not name.startswith("mmcblk"):
-            continue
-        try:
-            rem = (e / "removable").read_text().strip()
-            if rem == "1":
-                continue
-        except Exception:
-            continue
-        try:
-            cid = (e / "device" / "cid").read_text().strip().lower()
-            cid = re.sub(r"\s+", "", cid)
-            if cid:
-                cids.append(cid)
-        except Exception:
-            continue
-    return sorted(cids)[0] if cids else ""
-
 def read_board_name():
     """Read DMI board_name (lower/trimmed, no inner spaces) with Jetson DT fallback."""
     s = read_first_line("/sys/class/dmi/id/board_name")
@@ -273,26 +236,17 @@ def calc_components():
             )
             sys.exit(3)
 
-        # Tegra binding: prefer SoC ECID, fallback to SOM serial or legacy eMMC CID
+        # Tegra binding: uniformly uses SoC ECID
         ecid = read_tegra_ecid()
-        sn = read_tegra_module_serial()
-        cid = read_emmc_cid()
-
-        if ecid:
-            parts.append(f"gpu:tegra-ecid-{ecid}")
-        elif sn:
-            print("INFO: Tegra SoC ECID not readable via current user permission. Using SOM Module Serial.", file=sys.stderr)
-            print("HINT: Run with 'sudo python3 collect_hwid.py' to enable SoC ECID binding.", file=sys.stderr)
-            parts.append(f"gpu:tegra-sn-{sn}")
-        elif cid:
-            parts.append(f"gpu:{cid}")
-        else:
+        if not ecid:
             print(
-                "ERROR: Tegra platform detected, but neither ECID nor SOM Module Serial could be resolved.\n"
+                "ERROR: Tegra platform detected, but SoC ECID could not be resolved.\n"
                 "Please run: sudo python3 collect_hwid.py",
                 file=sys.stderr,
             )
             sys.exit(3)
+
+        parts.append(f"gpu:tegra-ecid-{ecid}")
     else:
         parts.append("gpu:" + ";".join(uuids))
 
