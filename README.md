@@ -6,10 +6,12 @@ It collects a set of hardware identifiers (HWID) from the target machine, hashes
 
 ## Features
 
+- Supports both **x86_64** (Intel/AMD) and **ARM64** (NVIDIA Jetson / Orin) platforms
 - Collects hardware identifiers without using MAC addresses  
+- Uses NVIDIA GPU UUID on desktop/server GPUs and Tegra SoC ECID on Jetson platforms
 - Generates reproducible HWID (SHA-256) from system components  
 - Produces a `license_request-<HWID>.json` file ready to send to AutoDrive  
-- Simple command-line usage (Python 3.x required)  
+- Simple command-line usage (Python 3.x required, no external dependencies)  
 
 ## Installation
 Clone the repository to the target machine where you want to generate the license request:
@@ -33,6 +35,12 @@ No additional dependencies are required (only Python standard library).
 python3 ./collect_hwid.py --customer <YOUR_COMPANY_NAME>
 ```
 
+> **Note for Jetson / Orin platforms**:  
+> Reading the Tegra SoC ECID may require root permissions depending on your system's sysfs configuration. If permission is denied, run with `sudo`:
+> ```bash
+> sudo python3 ./collect_hwid.py --customer <YOUR_COMPANY_NAME>
+> ```
+
 This will generate a file named `license_request-<HWID>.json` in the current directory, where `<HWID>` is derived from the machine’s hardware fingerprint. The script will also print the HWID (SHA-256 hash) to the console.
 
 ## Output Format
@@ -46,19 +54,22 @@ The generated JSON file contains:
   "customer": "YourCompany",
   "features": ["AutoDrive"],
   "hwid_components": [
-    "brd:1...",
-    "cpui:a...",
-    "cpus:1...",
-    "cpuv:e...",
-    "gpu:gpu-000000..."
+    "brd:...",
+    "cpui:...",
+    "cpus:...",
+    "cpuv:...",
+    "gpu:tegra-ecid-0x..."
   ],
   "hwid_sha256": "6b08a0f3...",
   "env": {
     "uname": "Linux 5.15.0-72-generic",
-    "in_docker_hint": false
+    "in_docker_hint": false,
+    "gpu_count": 1
   }
 }
 ```
+
+*Note: The `gpu:` component is `gpu:tegra-ecid-<ECID>` on Jetson/Orin platforms, or `gpu:<UUID>` on platforms with discrete NVIDIA GPUs.*
 
 ## Next Step
 
