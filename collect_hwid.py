@@ -22,16 +22,17 @@ def read_all(p: str) -> str:
 def is_tegra() -> bool:
     """Detect Jetson / Orin (Tegra) via device-tree compatible string."""
     try:
-        compat = read_all("/sys/firmware/devicetree/base/compatible")
-        compat = compat.lower()
-        return "nvidia,tegra" in compat
+        compat = read_all("/sys/firmware/devicetree/base/compatible").lower()
+        if "nvidia,tegra" in compat:
+            return True
+        compat_proc = read_all("/proc/device-tree/compatible").lower()
+        return "nvidia,tegra" in compat_proc
     except Exception:
         return False
 
 def is_wsl() -> bool:
     """Best-effort detection for WSL/WSL2."""
     try:
-        # Common env hints
         if os.environ.get("WSL_INTEROP") or os.environ.get("WSL_DISTRO_NAME"):
             return True
         rel = read_all("/proc/sys/kernel/osrelease").lower()
@@ -80,6 +81,7 @@ def parse_cpuinfo():
             part = re.sub(r"\s+", "", v)
         elif k == "cpurevision":
             rev = re.sub(r"\s+", "", v)
+
     # x86 path
     if vendor and family and model and stepping:
         present = sorted({t for t in re.split(r"\s+", flags) if t in _KEEP_FLAGS_X86})
@@ -129,50 +131,89 @@ def collect_gpu_uuids():
     uuids = sorted(sorted(set(uuids)))
     return uuids
 
-def read_emmc_cid():
-    """Return CID of first non-removable mmcblk* device (lowercase, no spaces)."""
-    base = Path("/sys/block")
-    if not base.exists():
-        return ""
-    cids = []
-    for e in base.iterdir():
-        name = e.name
-        if not name.startswith("mmcblk"):
-            continue
+def parse_fuse_output(text: str) -> str:
+    """Extract ECID value from nv_fuse_read.sh or similar command output."""
+    for line in text.splitlines():
+        line = line.strip()
+        if "ecid" in line.lower():
+            parts = line.split(":")
+            if len(parts) > 1:
+                val = parts[1].strip().lower()
+                if val:
+                    return re.sub(r"\s+", "", val)
+        elif line.startswith("0x") or (len(line) >= 16 and re.match(r"^[0-9a-fA-F]+$", line)):
+            return line.strip().lower()
+    return ""
+
+def read_tegra_ecid() -> str:
+    """
+    Read Tegra SoC ECID (Electronic Chip ID).
+    Primary hardware identity for Jetson Orin / AGX Orin / Orin NX / Orin Nano.
+    """
+    # sysfs nodes
+    for p in [
+        "/sys/devices/soc0/ecid",
+        "/sys/devices/platform/tegra-fuse/ecid",
+        "/sys/bus/nvmem/devices/tegra-fuse/nvmem",
+    ]:
+        val = read_first_line(p)
+        if val:
+            return val
+
+    # kernel command line
+    cmdline = read_all("/proc/cmdline")
+    m = re.search(r"(?:androidboot\.ecid|ecid)=([0-9a-fA-Fx]+)", cmdline)
+    if m:
+        return m.group(1).lower()
+
+    # nv_fuse_read.sh tool
+    for cmd in ["nv_fuse_read.sh", "/usr/sbin/nv_fuse_read.sh"]:
         try:
-            rem = (e / "removable").read_text().strip()
-            if rem == "1":
-                continue
+            out = subprocess.check_output([cmd, "ecid"], stderr=subprocess.DEVNULL, text=True)
+            val = parse_fuse_output(out)
+            if val:
+                return val
         except Exception:
-            continue
+            pass
+
         try:
-            cid = (e / "device" / "cid").read_text().strip().lower()
-            cid = re.sub(r"\s+", "", cid)
-            if cid:
-                cids.append(cid)
+            out = subprocess.check_output(["sudo", "-n", cmd, "ecid"], stderr=subprocess.DEVNULL, text=True)
+            val = parse_fuse_output(out)
+            if val:
+                return val
         except Exception:
-            continue
-    return sorted(cids)[0] if cids else ""
+            pass
+
+    return ""
 
 def read_board_name():
-    """Read DMI board_name (lower/trimmed, no inner spaces)."""
+    """Read DMI board_name (lower/trimmed, no inner spaces) with Jetson DT fallback."""
     s = read_first_line("/sys/class/dmi/id/board_name")
     if s:
         return s
     if is_wsl():
         return "wsl"
+    if is_tegra():
+        for p in ["/proc/device-tree/model", "/sys/firmware/devicetree/base/model"]:
+            try:
+                raw = Path(p).read_bytes().rstrip(b"\x00").decode("utf-8", errors="ignore").strip()
+                val = re.sub(r"\s+", "", raw).lower()
+                if val:
+                    return val
+            except Exception:
+                pass
     return ""
 
 def calc_components():
     """
-    Build a normalized, labeled component list. ALL three sources are required.
+    Build a normalized, labeled component list. ALL required sources must be resolved.
     If any source is missing, exit with error.
     """
     parts = []
 
     bn = read_board_name()
     if not bn:
-        print("ERROR: missing DMI board_name (/sys/class/dmi/id/board_name)", file=sys.stderr)
+        print("ERROR: missing board identifier (/sys/class/dmi/id/board_name or device-tree model)", file=sys.stderr)
         sys.exit(3)
     parts.append(f"brd:{bn}")
 
@@ -194,14 +235,18 @@ def calc_components():
                 file=sys.stderr,
             )
             sys.exit(3)
-        cid = read_emmc_cid()
-        if not cid:
+
+        # Tegra binding: uniformly uses SoC ECID
+        ecid = read_tegra_ecid()
+        if not ecid:
             print(
-                "ERROR: Tegra platform detected but eMMC CID not readable",
+                "ERROR: Tegra platform detected, but SoC ECID could not be resolved.\n"
+                "Please run: sudo python3 collect_hwid.py",
                 file=sys.stderr,
             )
             sys.exit(3)
-        parts.append("gpu:" + cid)
+
+        parts.append(f"gpu:tegra-ecid-{ecid}")
     else:
         parts.append("gpu:" + ";".join(uuids))
 
