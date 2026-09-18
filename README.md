@@ -40,6 +40,10 @@ python3 ./collect_hwid.py --customer <YOUR_COMPANY_NAME>
 > ```bash
 > sudo python3 ./collect_hwid.py --customer <YOUR_COMPANY_NAME>
 > ```
+> To allow non-root users (e.g. running Autoware) to read the SoC ECID without password prompts, configure passwordless sudo access once on the target machine:
+> ```bash
+> echo "ALL ALL=(ALL) NOPASSWD: /usr/sbin/nv_fuse_read.sh" | sudo tee /etc/sudoers.d/nv_fuse_read
+> ```
 
 This will generate a file named `license_request-<HWID>.json` in the current directory, where `<HWID>` is derived from the machine’s hardware fingerprint. The script will also print the HWID (SHA-256 hash) to the console.
 
